@@ -587,12 +587,35 @@ if page == "🔬 Analyze Patient":
         else:
             st.caption("Click **Start recording**, take a breath, hold a steady **'Aaah'** for "
                        "3–10 seconds, then click **Stop recording**.")
-            mic_result = mic_recorder(start_prompt="🎙️ Start recording", stop_prompt="⏹️ Stop recording",
-                                       just_once=False, format="wav", key="mic")
+            st.info("⚠️ Having trouble with live recording? Use **Upload file** instead — record a "
+                    "voice memo with your phone's built-in recorder app, then upload it here. That "
+                    "path is fully tested and works on any device.")
+            try:
+                mic_result = mic_recorder(start_prompt="🎙️ Start recording", stop_prompt="⏹️ Stop recording",
+                                           just_once=False, format="wav", key="mic")
+            except Exception as e:
+                st.error(f"The recorder widget failed to load ({type(e).__name__}: {e}). "
+                         "Please use Upload file instead.")
+                mic_result = None
             audio_file = None
-            if mic_result is not None and mic_result.get("bytes"):
-                audio_file = io.BytesIO(mic_result["bytes"])
-                audio_file.name = f"recording.{mic_result.get('format','wav')}"
+            if mic_result is None:
+                st.caption("🔴 No recording yet. Click Start recording above, allow microphone "
+                           "access when your browser asks, speak, then click Stop recording.")
+            elif not mic_result.get("bytes"):
+                st.warning(f"Recording finished but no audio data came back (got: {mic_result}). "
+                           "This usually means the microphone permission was denied or no input "
+                           "device was found. Please check your browser's site settings and try again, "
+                           "or use Upload file instead.")
+            else:
+                n_bytes = len(mic_result["bytes"])
+                st.caption(f"✅ Recording received: {n_bytes:,} bytes, "
+                           f"{mic_result.get('sample_rate','?')} Hz, format={mic_result.get('format','?')}")
+                if n_bytes < 1000:
+                    st.warning("This recording looks too small to contain real audio — it may be "
+                               "empty or corrupted. Please try again or use Upload file instead.")
+                else:
+                    audio_file = io.BytesIO(mic_result["bytes"])
+                    audio_file.name = f"recording.{mic_result.get('format','wav')}"
     with col_info:
         st.markdown("""<div class='card'>
         <b style='color:#58A6FF'>Recording Guidelines</b><br><br>
