@@ -575,8 +575,14 @@ if page == "🔬 Analyze Patient":
 
     col_up, col_info = st.columns([2,1])
     with col_up:
-        audio_file = st.file_uploader("Upload voice recording (.wav)", type=["wav"],
-                                       help="Sustained 'Aaah' vowel, 3–10 seconds, mono or stereo")
+        input_mode = st.radio("Input method", ["📁 Upload file", "🎙️ Record live"],
+                               horizontal=True, label_visibility="collapsed")
+        if input_mode == "📁 Upload file":
+            audio_file = st.file_uploader("Upload voice recording (.wav)", type=["wav"],
+                                           help="Sustained 'Aaah' vowel, 3–10 seconds, mono or stereo")
+        else:
+            st.caption("Click the mic, take a breath, then hold a steady **'Aaah'** for 3–10 seconds.")
+            audio_file = st.audio_input("Record a sustained 'Aaah' vowel")
     with col_info:
         st.markdown("""<div class='card'>
         <b style='color:#58A6FF'>Recording Guidelines</b><br><br>
