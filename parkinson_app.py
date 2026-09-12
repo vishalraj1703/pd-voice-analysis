@@ -581,7 +581,9 @@ if page == "🔬 Analyze Patient":
             audio_file = st.file_uploader("Upload voice recording (.wav)", type=["wav"],
                                            help="Sustained 'Aaah' vowel, 3–10 seconds, mono or stereo")
         else:
-            st.caption("Click the mic, take a breath, then hold a steady **'Aaah'** for 3–10 seconds.")
+            st.caption("Click the mic, take a breath, then hold a steady **'Aaah'** for 3–10 seconds. "
+                       "Works best in **Chrome or Edge** — Firefox has a known bug where the played-back "
+                       "recording sounds sped up (the analysis itself is unaffected).")
             audio_file = st.audio_input("Record a sustained 'Aaah' vowel")
     with col_info:
         st.markdown("""<div class='card'>
@@ -599,6 +601,10 @@ if page == "🔬 Analyze Patient":
             with st.spinner("Extracting voice biomarkers... (30–60 sec for CNN features)"):
                 wav_bytes,sr = librosa.load(io.BytesIO(audio_file.read()), sr=SR, mono=True)
                 duration = len(wav_bytes) / sr
+                st.caption(f"🎧 Detected recording length: **{duration:.1f}s** "
+                           "(if this doesn't match what you recorded, the playback above may be "
+                           "misreporting speed — a known browser issue on Firefox with live recording; "
+                           "the number here reflects what was actually analyzed).")
                 if duration < 1.0:
                     st.warning(f"Recording is only {duration:.1f}s long. Please provide at least "
                                "1–2 seconds of sustained vowel sound and try again.")
