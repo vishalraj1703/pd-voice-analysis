@@ -381,13 +381,13 @@ def _do_extract(sig, sr):
 # ══════════════════════════════════════════════════════════════════════════════
 def gauge_chart(prob, threshold):
     pct = prob*100
-    if prob >= threshold: color,label = "#FF4444","HIGH RISK"
-    elif prob >= threshold-0.1: color,label = "#FFAA44","MODERATE"
-    else: color,label = "#44FF88","LOW RISK"
+    if prob >= threshold: color,label = "#FF4444","ABOVE THRESHOLD"
+    elif prob >= threshold-0.1: color,label = "#FFAA44","NEAR THRESHOLD"
+    else: color,label = "#44FF88","BELOW THRESHOLD"
     fig = go.Figure(go.Indicator(
         mode="gauge+number+delta",
         value=pct,
-        number={"suffix":"%","font":{"size":36,"color":"#E6EDF3"}},
+        number={"font":{"size":36,"color":"#E6EDF3"}},
         delta={"reference":threshold*100,"increasing":{"color":"#FF4444"},"decreasing":{"color":"#44FF88"}},
         gauge={
             "axis":{"range":[0,100],"tickcolor":"#8B949E","tickfont":{"color":"#8B949E"}},
@@ -400,7 +400,7 @@ def gauge_chart(prob, threshold):
             ],
             "threshold":{"line":{"color":"#FFFFFF","width":2},"thickness":0.8,"value":threshold*100},
         },
-        title={"text":f"PD Probability  |  {label}","font":{"size":14,"color":"#8B949E"}},
+        title={"text":f"Uncalibrated PD Score (not a probability)  |  {label}","font":{"size":14,"color":"#8B949E"}},
     ))
     fig.update_layout(paper_bgcolor="rgba(0,0,0,0)",font={"color":"#E6EDF3"},
                       height=260,margin=dict(l=20,r=20,t=40,b=10))
@@ -547,7 +547,7 @@ with st.sidebar:
     st.divider()
     st.markdown("**Dataset**")
     st.markdown("77 patients · 39 HC · 38 PD")
-    st.markdown("**Best Model**")
+    st.markdown("**Nested CV Result** (not shown to outperform a fixed baseline — see paper Table 2b)")
     if os.path.exists(os.path.join(ART_DIR,"cv_stats.pkl")):
         _cvs = pickle.load(open(os.path.join(ART_DIR,"cv_stats.pkl"),"rb"))
         _best = _cvs.get("Model C: + Optuna + Optimal Thresh", {})
@@ -671,22 +671,18 @@ if page == "🔬 Analyze Patient":
         # ── Screening-estimate banner (not a diagnosis) ─────────────────────
         st.markdown("---")
         is_pd  = prob >= threshold
-        conf   = abs(prob - 0.5) / 0.5
-        if conf > 0.6:   conf_label = "HIGH MODEL CONFIDENCE"
-        elif conf > 0.3: conf_label = "MODERATE MODEL CONFIDENCE"
-        else:            conf_label = "LOW MODEL CONFIDENCE — borderline case"
 
         if is_pd:
             st.markdown(f"""<div class='pred-pd'>
             <h2 style='color:#FF4444;margin:0'>⚠️ ELEVATED PD SCREENING ESTIMATE — SUGGEST CLINICAL FOLLOW-UP</h2>
-            <p style='color:#FFAAAA;margin:8px 0 0'>This is a research screening estimate, not a diagnosis. Voice biomarkers resemble the pattern seen in the Parkinson's disease group of this study's training cohort.<br>
-            Model probability: <b>{prob*100:.1f}%</b> &nbsp;|&nbsp; Decision threshold: {threshold*100:.0f}% &nbsp;|&nbsp; {conf_label}</p>
+            <p style='color:#FFAAAA;margin:8px 0 0'>This is a research screening estimate, not a diagnosis. Voice features resemble the pattern seen in the Parkinson's disease group of this study's training cohort.<br>
+            Uncalibrated model score: <b>{prob*100:.1f}</b> &nbsp;|&nbsp; Decision threshold: {threshold*100:.0f} &nbsp;|&nbsp; This score has not been validated as a calibrated probability — see the paper's Section 3.6.</p>
             </div>""", unsafe_allow_html=True)
         else:
             st.markdown(f"""<div class='pred-hc'>
             <h2 style='color:#44FF88;margin:0'>✅ LOW PD SCREENING ESTIMATE</h2>
-            <p style='color:#AAFFCC;margin:8px 0 0'>This is a research screening estimate, not a diagnosis. Voice biomarkers resemble the pattern seen in the healthy-control group of this study's training cohort.<br>
-            Model probability: <b>{prob*100:.1f}%</b> &nbsp;|&nbsp; Decision threshold: {threshold*100:.0f}% &nbsp;|&nbsp; {conf_label}</p>
+            <p style='color:#AAFFCC;margin:8px 0 0'>This is a research screening estimate, not a diagnosis. Voice features resemble the pattern seen in the healthy-control group of this study's training cohort.<br>
+            Uncalibrated model score: <b>{prob*100:.1f}</b> &nbsp;|&nbsp; Decision threshold: {threshold*100:.0f} &nbsp;|&nbsp; This score has not been validated as a calibrated probability — see the paper's Section 3.6.</p>
             </div>""", unsafe_allow_html=True)
 
         st.markdown("---")
@@ -728,14 +724,14 @@ if page == "🔬 Analyze Patient":
         st.markdown('<div class="section-header">🎯 Why This Prediction? (SHAP Explanation)</div>',
                     unsafe_allow_html=True)
         st.markdown(f"""<div class='card'>
-        Base rate: all patients average PD probability = <b>{td['expected_value']*100:.1f}%</b><br>
-        Your patient's probability: <b>{prob*100:.1f}%</b><br>
+        Base rate: mean uncalibrated model score across all training patients = <b>{td['expected_value']*100:.1f}</b><br>
+        This recording's uncalibrated model score: <b>{prob*100:.1f}</b> (not a calibrated probability — see paper Section 3.6)<br>
         The chart below shows which voice features moved this prediction up (🔴 toward PD) or down (🟢 toward HC).
         </div>""", unsafe_allow_html=True)
         st.plotly_chart(shap_chart(shap_v, feat_n, n=15), use_container_width=True)
 
         # ── Radar chart ────────────────────────────────────────────────────
-        st.markdown('<div class="section-header">📡 Voice Biomarker Profile vs Population</div>',
+        st.markdown('<div class="section-header">📡 Voice Feature Profile vs Training Set</div>',
                     unsafe_allow_html=True)
         col_r, col_t = st.columns([3,2])
         with col_r:
@@ -772,29 +768,21 @@ if page == "🔬 Analyze Patient":
 | **MFCC** | Vocal tract shape (timbre) | More variable coefficients |
 """)
 
-        # ── Clinical interpretation ─────────────────────────────────────────
+        # ── Research notes (not a clinical interpretation) ──────────────────
         st.markdown("---")
-        st.markdown('<div class="section-header">📋 Clinical Interpretation Notes</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">📋 Research Notes</div>', unsafe_allow_html=True)
         if is_pd:
-            st.warning(f"""**AI Assessment: Parkinson's Disease pattern detected ({prob*100:.1f}% probability)**
+            st.warning(f"""**Research pipeline output: features resemble this study's PD training group (uncalibrated score {prob*100:.1f})**
 
-Key findings in this voice sample:
-- Voice tremor and energy modulation are within the PD range
-- Vocal dip patterns and micro-break characteristics suggest motor control impairment
-- Spectral analysis shows reduced harmonic clarity consistent with PD phonation
+This is a pattern-matching result from a single-cohort, unvalidated research pipeline (see the accompanying paper). It is **not** a clinical finding: it does not establish tremor severity, motor impairment, or phonation abnormality, and no individual feature listed here has been validated as a clinical marker.
 
-**Recommendation:** Correlate with clinical examination (UPDRS-III), DaTscan, and medication history.
-This tool does not replace clinical diagnosis.""")
+This tool does not replace clinical diagnosis, DaTscan, or examination by a clinician, and its score has not been shown to be calibrated or externally validated.""")
         else:
-            st.success(f"""**AI Assessment: Healthy Control pattern ({(1-prob)*100:.1f}% probability of HC)**
+            st.success(f"""**Research pipeline output: features resemble this study's healthy-control training group (uncalibrated score {(1-prob)*100:.1f})**
 
-Key findings in this voice sample:
-- Voice tremor is within normal limits
-- Energy stability and vocal dip patterns are consistent with healthy phonation
-- Spectral analysis shows good harmonic structure
+This is a pattern-matching result from a single-cohort, unvalidated research pipeline (see the accompanying paper). It is **not** a clinical finding, and a low score here does not rule out Parkinson's disease, especially early or atypical presentations, which this single-cohort pipeline was never validated to detect.
 
-**Note:** A negative result does not exclude early or atypical Parkinson's Disease.
-Sustained vowel analysis is most sensitive for moderate-to-advanced PD.""")
+This tool does not replace clinical diagnosis, DaTscan, or examination by a clinician.""")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 2 — Model Performance
@@ -847,7 +835,7 @@ elif page == "📊 Model Performance":
             sens=tp/(tp+fn+1e-8); spec=tn/(tn+fp+1e-8)
             ppv =tp/(tp+fp+1e-8); npv=tn/(tn+fn+1e-8)
             st.markdown(f"""<div class='card'>
-            <b>Best Model Clinical Metrics</b><br><br>
+            <b>Nested CV Clinical Metrics</b><br><br>
             Sensitivity (TPR): <b>{sens*100:.1f}%</b><br>
             Specificity (TNR): <b>{spec*100:.1f}%</b><br>
             Positive Predictive Value: <b>{ppv*100:.1f}%</b><br>
@@ -857,7 +845,7 @@ elif page == "📊 Model Performance":
 
     # ── Global feature importance ───────────────────────────────────────────
     st.markdown("---")
-    st.markdown('<div class="section-header">🔍 Global Feature Importance (Best Model)</div>',
+    st.markdown('<div class="section-header">🔍 Global Feature Importance (Illustrative Configuration)</div>',
                 unsafe_allow_html=True)
     st.plotly_chart(global_importance_fig(pl["lr_model"],pl["feature_names"]),use_container_width=True)
     st.caption("Positive coefficients push prediction toward PD, negative toward HC. "
