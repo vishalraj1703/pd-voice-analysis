@@ -595,9 +595,23 @@ if page == "🔬 Analyze Patient":
 
     if audio_file is not None:
         st.audio(audio_file)
-        with st.spinner("Extracting voice biomarkers... (30–60 sec for CNN features)"):
-            wav_bytes,sr = librosa.load(io.BytesIO(audio_file.read()), sr=SR, mono=True)
-            results = _do_extract(wav_bytes, sr)
+        try:
+            with st.spinner("Extracting voice biomarkers... (30–60 sec for CNN features)"):
+                wav_bytes,sr = librosa.load(io.BytesIO(audio_file.read()), sr=SR, mono=True)
+                duration = len(wav_bytes) / sr
+                if duration < 1.0:
+                    st.warning(f"Recording is only {duration:.1f}s long. Please provide at least "
+                               "1–2 seconds of sustained vowel sound and try again.")
+                    st.stop()
+                if np.abs(wav_bytes).max() < 1e-4:
+                    st.warning("This recording appears to be silent or the volume is too low. "
+                               "Please check your microphone and try again.")
+                    st.stop()
+                results = _do_extract(wav_bytes, sr)
+        except Exception as e:
+            st.error(f"Could not process this audio file ({type(e).__name__}). "
+                     "Please make sure it's a valid, uncorrupted audio recording and try again.")
+            st.stop()
 
         prob      = results["prob"]
         threshold = pl["threshold"]
