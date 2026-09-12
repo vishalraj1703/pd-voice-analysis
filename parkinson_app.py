@@ -4,7 +4,7 @@ parkinson_app.py  —  Parkinson's Disease Voice Analysis System
 streamlit run parkinson_app.py
 """
 
-import os, sys, io, warnings, pickle, time
+import os, sys, io, warnings, pickle, time, tempfile
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 warnings.filterwarnings("ignore")
@@ -579,8 +579,10 @@ if page == "🔬 Analyze Patient":
         input_mode = st.radio("Input method", ["📁 Upload file", "🎙️ Record live"],
                                horizontal=True, label_visibility="collapsed")
         if input_mode == "📁 Upload file":
-            audio_file = st.file_uploader("Upload voice recording (.wav)", type=["wav"],
-                                           help="Sustained 'Aaah' vowel, 3–10 seconds, mono or stereo")
+            audio_file = st.file_uploader(
+                "Upload voice recording", type=["wav","mp3","m4a","ogg","flac","aac","webm","opus"],
+                help="Sustained 'Aaah' vowel, 3–10 seconds, mono or stereo. Any common audio "
+                     "format works — WAV, MP3, M4A, OGG, FLAC, AAC, WebM, Opus.")
         else:
             st.caption("Click the mic, take a breath, then hold a steady **'Aaah'** for 3–10 seconds. "
                        "Works best in **Chrome or Edge** — Firefox has a known bug where the played-back "
@@ -599,7 +601,18 @@ if page == "🔬 Analyze Patient":
     if audio_file is not None:
         try:
             with st.spinner("Extracting voice biomarkers... (30–60 sec for CNN features)"):
-                wav_bytes,sr = librosa.load(io.BytesIO(audio_file.read()), sr=SR, mono=True)
+                # Route through a real temp file rather than an in-memory buffer:
+                # compressed formats (MP3/M4A/AAC) fall back from soundfile to the
+                # ffmpeg-based audioread backend, which needs an actual file path
+                # to hand to the ffmpeg subprocess, not a BytesIO object.
+                suffix = os.path.splitext(getattr(audio_file, "name", "") or "")[1] or ".wav"
+                with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                    tmp.write(audio_file.read())
+                    tmp_path = tmp.name
+                try:
+                    wav_bytes,sr = librosa.load(tmp_path, sr=SR, mono=True)
+                finally:
+                    os.remove(tmp_path)
                 duration = len(wav_bytes) / sr
 
                 # Re-encode the decoded PCM to a clean WAV for playback, instead of
