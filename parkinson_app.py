@@ -29,6 +29,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 
 import streamlit as st
+from streamlit_mic_recorder import mic_recorder
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 
@@ -584,10 +585,14 @@ if page == "🔬 Analyze Patient":
                 help="Sustained 'Aaah' vowel, 3–10 seconds, mono or stereo. Any common audio "
                      "format works — WAV, MP3, M4A, OGG, FLAC, AAC, WebM, Opus.")
         else:
-            st.caption("Click the mic, take a breath, then hold a steady **'Aaah'** for 3–10 seconds. "
-                       "Works best in **Chrome or Edge** — Firefox has a known bug where the played-back "
-                       "recording sounds sped up (the analysis itself is unaffected).")
-            audio_file = st.audio_input("Record a sustained 'Aaah' vowel")
+            st.caption("Click **Start recording**, take a breath, hold a steady **'Aaah'** for "
+                       "3–10 seconds, then click **Stop recording**.")
+            mic_result = mic_recorder(start_prompt="🎙️ Start recording", stop_prompt="⏹️ Stop recording",
+                                       just_once=False, format="wav", key="mic")
+            audio_file = None
+            if mic_result is not None and mic_result.get("bytes"):
+                audio_file = io.BytesIO(mic_result["bytes"])
+                audio_file.name = f"recording.{mic_result.get('format','wav')}"
     with col_info:
         st.markdown("""<div class='card'>
         <b style='color:#58A6FF'>Recording Guidelines</b><br><br>

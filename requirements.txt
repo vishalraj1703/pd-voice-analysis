@@ -1,4 +1,5 @@
 streamlit==1.42.2
+streamlit-mic-recorder==0.0.8
 numpy==2.0.2
 pandas==2.2.3
 librosa==0.11.0
