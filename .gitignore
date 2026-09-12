@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.claude/
+
+# Raw audio dataset (not needed at runtime; only model_artifacts/ is)
+Healthy/
+PD/
+training_set.csv
+blind_test_set.csv
+
+# Backup artifact files (history only, not needed by the app)
+model_artifacts/*.OLD_LEAKED_BACKUP
+model_artifacts/*.PRE_NESTED_BACKUP
+
+# Local scratch / experiment scripts not required to run the app
+*.docx
