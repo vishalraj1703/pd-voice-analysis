@@ -29,7 +29,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 
 import streamlit as st
-from mic_recorder_patched import mic_recorder
+from raw_recorder import raw_recorder
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 
@@ -590,18 +590,22 @@ if page == "🔬 Analyze Patient":
             st.info("⚠️ Having trouble with live recording? Use **Upload file** instead — record a "
                     "voice memo with your phone's built-in recorder app, then upload it here. That "
                     "path is fully tested and works on any device.")
-            mic_result = mic_recorder(start_prompt="🎙️ Start recording", stop_prompt="⏹️ Stop recording",
-                                       just_once=False, format="wav", key="mic")
+            mic_result = raw_recorder(key="mic")
             audio_file = None
             if mic_result is not None and mic_result.get("bytes"):
                 n_bytes = len(mic_result["bytes"])
-                st.caption(f"✅ Recording received: {n_bytes:,} bytes")
+                st.caption(f"✅ Recording received: {n_bytes:,} bytes, mime={mic_result.get('mime_type','?')}")
                 if n_bytes < 1000:
                     st.warning("This recording looks too small to contain real audio — it may be "
                                "empty or corrupted. Please try again or use Upload file instead.")
                 else:
+                    ext = ".webm"
+                    mime = mic_result.get("mime_type", "")
+                    if "mp4" in mime: ext = ".mp4"
+                    elif "ogg" in mime: ext = ".ogg"
+                    elif "wav" in mime: ext = ".wav"
                     audio_file = io.BytesIO(mic_result["bytes"])
-                    audio_file.name = f"recording.{mic_result.get('format','wav')}"
+                    audio_file.name = f"recording{ext}"
     with col_info:
         st.markdown("""<div class='card'>
         <b style='color:#58A6FF'>Recording Guidelines</b><br><br>

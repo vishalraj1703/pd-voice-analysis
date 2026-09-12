@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<style>
+  html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: transparent; }
+  #wrap { padding: 4px 0; }
+  button {
+    padding: 10px 18px; font-size: 15px; font-weight: 600; border-radius: 8px;
+    border: none; cursor: pointer; color: #fff;
+  }
+  #startBtn { background: #FF4B4B; }
+  #startBtn:hover { background: #E03C3C; }
+  #stopBtn { background: #31333F; }
+  #stopBtn:hover { background: #1a1c24; }
+  #status { margin-top: 8px; font-size: 13px; color: #808495; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <button id="startBtn">🎙️ Start recording</button>
+  <button id="stopBtn" style="display:none">⏹️ Stop recording</button>
+  <div id="status">Click Start recording and allow microphone access.</div>
+</div>
+<script>
+(function () {
+  // -- Minimal hand-implementation of the Streamlit custom-component wire
+  // protocol (verified against a known-working component's compiled output;
+  // no framework or build step). --
+  function sendBackMsg(type, extra) {
+    window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type: type }, extra || {}), "*");
+  }
+  function setFrameHeight() {
+    sendBackMsg("streamlit:setFrameHeight", { height: document.body.scrollHeight + 10 });
+  }
+  function setComponentValue(value) {
+    sendBackMsg("streamlit:setComponentValue", { value: value, dataType: "json" });
+  }
+  sendBackMsg("streamlit:componentReady", { apiVersion: 1 });
+  setFrameHeight();
+  window.addEventListener("load", setFrameHeight);
+  setTimeout(setFrameHeight, 50);
+  setTimeout(setFrameHeight, 250);
+
+  const startBtn = document.getElementById("startBtn");
+  const stopBtn = document.getElementById("stopBtn");
+  const status = document.getElementById("status");
+
+  let mediaRecorder = null;
+  let chunks = [];
+  let stream = null;
+  let recId = 0;
+
+  startBtn.onclick = async function () {
+    status.textContent = "Requesting microphone access...";
+    try {
+      // Explicitly disable browser-side audio processing: echo cancellation,
+      // noise suppression, and auto gain control are tuned for conversational
+      // speech and can gate a flat, unchanging sustained vowel down toward
+      // silence. Recording the raw signal avoids that entirely.
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      });
+    } catch (e) {
+      status.textContent = "Microphone access failed: " + e.name + " -- " + e.message;
+      setFrameHeight();
+      return;
+    }
+
+    chunks = [];
+    // MediaRecorder handles encoding natively (outside page JavaScript),
+    // unlike ScriptProcessorNode-based recorders which capture audio
+    // sample-by-sample on the page's own main thread and can silently drop
+    // or zero out audio if that thread is busy -- exactly the class of bug
+    // this replaces.
+    let mimeType = "";
+    const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+    for (const c of candidates) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c)) {
+        mimeType = c;
+        break;
+      }
+    }
+    try {
+      mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType: mimeType }) : new MediaRecorder(stream);
+    } catch (e) {
+      status.textContent = "Could not start recorder: " + e.message;
+      setFrameHeight();
+      return;
+    }
+
+    mediaRecorder.ondataavailable = function (e) {
+      if (e.data && e.data.size > 0) chunks.push(e.data);
+    };
+    mediaRecorder.onstop = function () {
+      const blob = new Blob(chunks, { type: mediaRecorder.mimeType || mimeType || "audio/webm" });
+      const reader = new FileReader();
+      reader.onloadend = function () {
+        const base64 = reader.result.split(",")[1];
+        recId += 1;
+        setComponentValue({
+          audio_base64: base64,
+          mime_type: blob.type,
+          size: blob.size,
+          id: recId
+        });
+        status.textContent = "Recording sent: " + blob.size.toLocaleString() + " bytes.";
+        setFrameHeight();
+      };
+      reader.readAsDataURL(blob);
+      stream.getTracks().forEach(function (t) { t.stop(); });
+    };
+
+    mediaRecorder.start();
+    startBtn.style.display = "none";
+    stopBtn.style.display = "inline-block";
+    status.textContent = "Recording... speak now.";
+    setFrameHeight();
+  };
+
+  stopBtn.onclick = function () {
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+    }
+    stopBtn.style.display = "none";
+    startBtn.style.display = "inline-block";
+    status.textContent = "Processing recording...";
+    setFrameHeight();
+  };
+})();
+</script>
+</body>
+</html>
