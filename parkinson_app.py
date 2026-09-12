@@ -12,6 +12,7 @@ warnings.filterwarnings("ignore")
 import numpy as np
 import pandas as pd
 import librosa
+import soundfile as sf
 import shap
 from PIL import Image
 from scipy.stats import kurtosis as sp_kurt, skew as sp_skew
@@ -596,15 +597,21 @@ if page == "🔬 Analyze Patient":
         </div>""", unsafe_allow_html=True)
 
     if audio_file is not None:
-        st.audio(audio_file)
         try:
             with st.spinner("Extracting voice biomarkers... (30–60 sec for CNN features)"):
                 wav_bytes,sr = librosa.load(io.BytesIO(audio_file.read()), sr=SR, mono=True)
                 duration = len(wav_bytes) / sr
-                st.caption(f"🎧 Detected recording length: **{duration:.1f}s** "
-                           "(if this doesn't match what you recorded, the playback above may be "
-                           "misreporting speed — a known browser issue on Firefox with live recording; "
-                           "the number here reflects what was actually analyzed).")
+
+                # Re-encode the decoded PCM to a clean WAV for playback, instead of
+                # replaying the browser's raw recording blob directly: st.audio_input's
+                # webm/ogg output has known duration/speed metadata bugs on Firefox
+                # (streamlit/streamlit#9799) that make correct audio sound sped up.
+                clean_wav_buf = io.BytesIO()
+                sf.write(clean_wav_buf, wav_bytes, sr, format="WAV")
+                st.audio(clean_wav_buf.getvalue(), format="audio/wav")
+                st.caption(f"🎧 Playing back the {duration:.1f}s recording as analyzed by the model "
+                           "(re-encoded server-side to avoid a browser playback-speed bug).")
+
                 if duration < 1.0:
                     st.warning(f"Recording is only {duration:.1f}s long. Please provide at least "
                                "1–2 seconds of sustained vowel sound and try again.")
