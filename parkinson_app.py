@@ -619,8 +619,14 @@ if page == "🔬 Analyze Patient":
                 # replaying the browser's raw recording blob directly: st.audio_input's
                 # webm/ogg output has known duration/speed metadata bugs on Firefox
                 # (streamlit/streamlit#9799) that make correct audio sound sped up.
+                # subtype="PCM_16" matters: librosa returns float32 samples, and
+                # soundfile defaults to writing 32-bit FLOAT wav for float input --
+                # a format many mobile browsers (esp. Safari/iOS) only partially
+                # support, playing back a few seconds and then going silent.
+                # 16-bit PCM WAV is universally supported everywhere.
+                pcm16 = np.clip(wav_bytes, -1.0, 1.0)
                 clean_wav_buf = io.BytesIO()
-                sf.write(clean_wav_buf, wav_bytes, sr, format="WAV")
+                sf.write(clean_wav_buf, pcm16, sr, format="WAV", subtype="PCM_16")
                 st.audio(clean_wav_buf.getvalue(), format="audio/wav")
                 st.caption(f"🎧 Playing back the {duration:.1f}s recording as analyzed by the model "
                            "(re-encoded server-side to avoid a browser playback-speed bug).")
