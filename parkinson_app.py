@@ -102,7 +102,7 @@ FEATURE_META = {
 
 MODEL_LABELS = {
     "Model A: Baseline + Frame":          {"label":"Baseline + Frame Features (fixed, untuned)",   "color":"#636EFA","rank":3},
-    "Model B: + New Audio + SMOTE":       {"label":"+ TKEO + GNE + SMOTE (fixed, untuned)",        "color":"#EF553B","rank":2},
+    "Model B: + New Audio + SMOTE":       {"label":"+ TKEO + Voicing-Clarity + SMOTE (fixed, untuned)", "color":"#EF553B","rank":2},
     "Model C: + Optuna + Optimal Thresh": {"label":"Full Pipeline — Nested CV (honest estimate)",  "color":"#00CC96","rank":1},
 }
 
@@ -453,7 +453,7 @@ def radar_chart(radar_raw, tab_stats, radar_features):
         polar=dict(radialaxis=dict(visible=True,range=[0,100],color="#8B949E",gridcolor="#21262D"),
                    angularaxis=dict(color="#C9D1D9"),bgcolor="rgba(0,0,0,0)"),
         paper_bgcolor="rgba(0,0,0,0)",legend=dict(font=dict(color="#C9D1D9"),bgcolor="rgba(0,0,0,0)"),
-        title={"text":"Voice Biomarker Profile (0–100 normalised to dataset range)",
+        title={"text":"Voice Feature Profile (0–100 normalised to dataset range)",
                "font":{"color":"#58A6FF","size":13}},
         height=420, margin=dict(l=60,r=60,t=50,b=30),
     )
@@ -573,7 +573,7 @@ pl, cv_stats, td = load_artifacts()
 # ══════════════════════════════════════════════════════════════════════════════
 if page == "🔬 Analyze Patient":
     st.markdown("# 🔬 Patient Voice Analysis")
-    st.markdown("Upload a sustained **'Aaah'** vowel recording (.wav) to analyze for Parkinson's Disease biomarkers.")
+    st.markdown("Upload a sustained **'Aaah'** vowel recording (.wav) to analyze for Parkinson's Disease-associated voice features.")
 
     col_up, col_info = st.columns([2,1])
     with col_up:
@@ -618,7 +618,7 @@ if page == "🔬 Analyze Patient":
 
     if audio_file is not None:
         try:
-            with st.spinner("Extracting voice biomarkers... (30–60 sec for CNN features)"):
+            with st.spinner("Extracting voice features... (30–60 sec for CNN features)"):
                 # Route through a real temp file rather than an in-memory buffer:
                 # compressed formats (MP3/M4A/AAC) fall back from soundfile to the
                 # ffmpeg-based audioread backend, which needs an actual file path
@@ -692,7 +692,7 @@ if page == "🔬 Analyze Patient":
         with col_g:
             st.plotly_chart(gauge_chart(prob, threshold), use_container_width=True)
         with col_m:
-            st.markdown("#### Key Voice Biomarkers")
+            st.markdown("#### Key Voice Features")
             rr  = results["radar_raw"]
             ts  = pl["tab_stats"]
             rf  = pl["radar_features"]
@@ -913,30 +913,33 @@ elif page == "ℹ️ About":
     with col1:
         st.markdown("""<div class='card'>
         <h3 style='color:#58A6FF'>How It Works</h3>
-        <p>This system analyzes a sustained 'Aaah' vowel recording to detect Parkinson's Disease
-        acoustic biomarkers using a multi-stage AI pipeline:</p>
+        <p>This research demonstration analyzes a sustained 'Aaah' vowel recording using
+        engineered acoustic and CNN-derived voice features in a multi-stage pipeline. It is not
+        a validated diagnostic system (see the accompanying paper for the single-cohort,
+        age-confounded evaluation this is based on):</p>
         <ol>
         <li><b>Spectrogram extraction</b>: Mel, Chroma, and MFCC time-frequency images</li>
         <li><b>CNN feature extraction</b>: MobileNetV2 extracts 1280-dim visual patterns from each spectrogram</li>
         <li><b>PCA compression</b>: Reduced to 35 compact CNN features</li>
         <li><b>Frame-level analysis</b>: 473 per-frame acoustic statistics → top 40 selected by Cohen's d</li>
-        <li><b>Voice biomarkers</b>: TKEO energy modulation, GNE glottal noise, energy decay (12 features)</li>
+        <li><b>Engineered acoustic features</b>: TKEO energy modulation, harmonic/percussive voicing-clarity proxy, energy decay (12 features)</li>
         <li><b>Praat/Dynamics</b>: Jitter, shimmer, HNR, RPDE, DFA, PPE (8 features)</li>
         <li><b>Tabular features</b>: Dip patterns, micro-breaks, spectral features (26 total)</li>
-        <li><b>Logistic Regression</b>: Calibrated LR classifier with optimal threshold</li>
+        <li><b>Logistic Regression</b>: LR classifier with an uncalibrated score and a data-derived threshold (not independently validated — see paper Section 3.6)</li>
         </ol>
         </div>""", unsafe_allow_html=True)
 
         st.markdown("""<div class='card'>
-        <h3 style='color:#58A6FF'>Key Voice Biomarkers</h3>
+        <h3 style='color:#58A6FF'>Key Voice Features</h3>
+        <p style='font-size:12px;color:#8B949E'>Directional patterns below are descriptive statistics observed in this study's small, age-confounded training cohort, not established or externally validated clinical markers.</p>
         <table style='width:100%;border-collapse:collapse;color:#C9D1D9;font-size:13px'>
-        <tr style='border-bottom:1px solid #30363D'><th>Biomarker</th><th>Description</th><th>PD Pattern</th></tr>
+        <tr style='border-bottom:1px solid #30363D'><th>Feature</th><th>Description</th><th>Pattern in this cohort's PD group</th></tr>
         <tr><td>Tremor (4–7 Hz)</td><td>Voice energy oscillation</td><td>Elevated</td></tr>
         <tr><td>Jitter</td><td>Cycle-to-cycle pitch variation</td><td>Higher</td></tr>
         <tr><td>Shimmer</td><td>Amplitude variation between cycles</td><td>Higher</td></tr>
         <tr><td>HNR</td><td>Harmonic-to-noise ratio</td><td>Lower</td></tr>
         <tr><td>TKEO</td><td>Teager-Kaiser energy operator</td><td>More variable</td></tr>
-        <tr><td>GNE proxy</td><td>Glottal noise estimate</td><td>Lower clarity</td></tr>
+        <tr><td>Voicing-clarity proxy</td><td>Harmonic/percussive energy ratio</td><td>Lower clarity</td></tr>
         <tr><td>Voice dips</td><td>Breaks/drops in vocal energy</td><td>More frequent, longer</td></tr>
         <tr><td>RPDE</td><td>Recurrence period density entropy</td><td>Higher</td></tr>
         <tr><td>DFA</td><td>Detrended fluctuation analysis</td><td>Different scaling</td></tr>
@@ -945,31 +948,32 @@ elif page == "ℹ️ About":
 
     with col2:
         st.markdown("""<div class='card'>
-        <h3 style='color:#58A6FF'>Dataset & Performance</h3>
+        <h3 style='color:#58A6FF'>Dataset & Performance (nested CV, the paper's headline estimate)</h3>
         <table style='width:100%;border-collapse:collapse;color:#C9D1D9;font-size:13px'>
         <tr style='border-bottom:1px solid #30363D'><th>Property</th><th>Value</th></tr>
         <tr><td>Total patients</td><td>77 (39 HC, 38 PD)</td></tr>
         <tr><td>Task</td><td>Sustained 'Aaah' vowel</td></tr>
         <tr><td>Sample rate</td><td>22,050 Hz</td></tr>
-        <tr><td>Evaluation</td><td>5-Fold Stratified CV</td></tr>
-        <tr><td>Best AUC</td><td>0.8906</td></tr>
-        <tr><td>Best Accuracy</td><td>80.5% (optimal threshold)</td></tr>
-        <tr><td>Data ceiling</td><td>~82% (32/38 PD overlap HC)</td></tr>
+        <tr><td>Evaluation</td><td>Nested 5-Fold Stratified CV</td></tr>
+        <tr><td>AUC</td><td>0.828 (bootstrap interval 0.724–0.912)</td></tr>
+        <tr><td>Accuracy</td><td>72.7% (62.3–81.8%)</td></tr>
+        <tr><td>Sensitivity / Specificity</td><td>65.8% / 79.5%</td></tr>
         </table>
+        <p style='font-size:11px;color:#8B949E'>A controlled ablation found no evidence that this tuned/nested procedure outperforms a simpler fixed baseline — see paper Table 2b.</p>
         </div>""", unsafe_allow_html=True)
 
         st.markdown("""<div class='card'>
-        <h3 style='color:#58A6FF'>Model Architecture</h3>
-        <b>Feature vector: 113 dimensions</b><br><br>
+        <h3 style='color:#58A6FF'>Illustrative Deployed Configuration (used for the SHAP walkthrough above, NOT the performance estimate)</h3>
+        <b>Feature vector: 93 dimensions at K=20</b> (103 or 113 in nested outer folds that selected K=30 or K=40 — see paper Section 3.2)<br><br>
         • CNN Mel PCA: 15 dims<br>
         • CNN Chroma PCA: 10 dims<br>
         • CNN MFCC PCA: 10 dims<br>
         • Tabular (dip + spectral + praat + dynamics + interactions): 26 dims<br>
-        • Frame features (top 40 by Cohen's d): 40 dims<br>
-        • New audio (TKEO + GNE + energy): 12 dims<br><br>
-        <b>Training:</b> BorderlineSMOTE → Optuna-tuned LR (C=0.024)<br>
-        <b>Threshold:</b> 0.274 (Youden J optimal)<br>
-        <b>Augmentation:</b> 4× per-patient (time-stretch × 2 + noise)
+        • Frame features (top 20 by Cohen's d): 20 dims<br>
+        • Engineered acoustic (TKEO + voicing-clarity proxy + energy): 12 dims<br><br>
+        <b>Training:</b> illustrative configuration only, K=20/C=0.0243 refit on all 77 recordings (one of the nested search's own per-fold outputs, chosen post hoc for this demonstration — not independently validated, and not the best-performing configuration; see paper Section 3.5)<br>
+        <b>Threshold:</b> 0.274 (Youden J on this configuration's own training data)<br>
+        <b>Augmentation:</b> 4× per-patient (time-stretch × 2 + noise), training data only
         </div>""", unsafe_allow_html=True)
 
         st.markdown("""<div class='card'>
@@ -977,7 +981,8 @@ elif page == "ℹ️ About":
         <ul style='color:#C9D1D9'>
         <li>Small dataset (n=77) — results may not generalise</li>
         <li>Sustained vowel only — running speech captures more PD-related deficits</li>
-        <li>84% of PD patients have features overlapping with healthy controls</li>
+        <li>32 of 38 PD patients (84%) have features overlapping with healthy controls</li>
+        <li>Two study groups differ in mean age by ~19 years — an age-only classifier reaches an AUC comparable to the full model, so CNN-feature attribution should not be read as disease-specific (see paper Section 3.1, 5.2)</li>
         <li>Model is most sensitive for moderate-to-advanced PD</li>
         <li>Not validated for clinical use — research tool only</li>
         <li>Recording quality significantly affects results</li>
